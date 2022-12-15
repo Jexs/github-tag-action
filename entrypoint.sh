@@ -176,8 +176,10 @@ then
 else
     if $with_v
     then
+        setOutput "new_tag_raw" "$new"
         new="$package-v$new"
     else
+        setOutput "new_tag_raw" "$new"
         new="$package-$new"
     fi
     echo -e "Bumping tag ${tag} - New tag ${new}"

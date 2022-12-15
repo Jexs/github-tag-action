@@ -18,6 +18,7 @@ major_string_token=${MAJOR_STRING_TOKEN:-#major}
 minor_string_token=${MINOR_STRING_TOKEN:-#minor}
 patch_string_token=${PATCH_STRING_TOKEN:-#patch}
 none_string_token=${NONE_STRING_TOKEN:-#none}
+package=${PACKAGE:-package}
 # since https://github.blog/2022-04-12-git-security-vulnerability-announced/ runner uses?
 git config --global --add safe.directory /github/workspace
 
@@ -39,6 +40,7 @@ echo -e "\tMAJOR_STRING_TOKEN: ${major_string_token}"
 echo -e "\tMINOR_STRING_TOKEN: ${minor_string_token}"
 echo -e "\tPATCH_STRING_TOKEN: ${patch_string_token}"
 echo -e "\tNONE_STRING_TOKEN: ${none_string_token}"
+echo -e "\tPACKAGE: ${package}"
 
 # verbose, show everything
 if $verbose
@@ -77,12 +79,12 @@ preTagFmt="^v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)$"
 # get latest tag that looks like a semver (with or without v)
 case "$tag_context" in
     *repo*) 
-        tag="$(git for-each-ref --sort=-v:refname --format '%(refname:lstrip=2)' | grep -E "$tagFmt" | head -n 1)"
-        pre_tag="$(git for-each-ref --sort=-v:refname --format '%(refname:lstrip=2)' | grep -E "$preTagFmt" | head -n 1)"
+        tag=$(git for-each-ref --sort=-v:refname --format '%(refname:lstrip=2)' | grep -E "^$package-v?[0-9]+\.[0-9]+\.[0-9]+$" | head -n1)
+        pre_tag=$(git for-each-ref --sort=-v:refname --format '%(refname:lstrip=2)' | grep -E "^$package-v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)?$" | head -n1)
         ;;
     *branch*) 
-        tag="$(git tag --list --merged HEAD --sort=-v:refname | grep -E "$tagFmt" | head -n 1)"
-        pre_tag="$(git tag --list --merged HEAD --sort=-v:refname | grep -E "$preTagFmt" | head -n 1)"
+        tag=$(git tag --list --merged HEAD --sort=-v:refname | grep -E "^$package-v?[0-9]+\.[0-9]+\.[0-9]+$" | head -n1)
+        pre_tag=$(git tag --list --merged HEAD --sort=-v:refname | grep -E "^$package-v?[0-9]+\.[0-9]+\.[0-9]+(-$suffix\.[0-9]+)?$" | head -n1)
         ;;
     * ) echo "Unrecognised context"
         exit 1;;
@@ -127,9 +129,9 @@ log=$(git show -s --format=%B)
 echo "Last commit message: $log"
 
 case "$log" in
-    *$major_string_token* ) new=$(semver -i major "$tag"); part="major";;
-    *$minor_string_token* ) new=$(semver -i minor "$tag"); part="minor";;
-    *$patch_string_token* ) new=$(semver -i patch "$tag"); part="patch";;
+    *$major_string_token* ) new=$(semver -i major -c "$tag"); part="major";;
+    *$minor_string_token* ) new=$(semver -i minor -c "$tag"); part="minor";;
+    *$patch_string_token* ) new=$(semver -i patch -c "$tag"); part="patch";;
     *$none_string_token* ) 
         echo "Default bump was set to none. Skipping..."
         setOutput "new_tag" "$tag"
@@ -143,7 +145,7 @@ case "$log" in
             setOutput "tag" "$tag"
             exit 0 
         else 
-            new=$(semver -i "${default_semvar_bump}" "$tag")
+            new=$(semver -i "${default_semvar_bump}" -c "$tag")
             part=$default_semvar_bump 
         fi 
         ;;
@@ -174,7 +176,9 @@ then
 else
     if $with_v
     then
-        new="v$new"
+        new="$package-v$new"
+    else
+        new="$package-$new"
     fi
     echo -e "Bumping tag ${tag} - New tag ${new}"
 fi
